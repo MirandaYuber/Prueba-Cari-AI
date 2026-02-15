@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<style>
+    body {
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background-color: #f4f7f6;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+    }
+
+    .card {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        width: 350px;
+        overflow: hidden;
+        border-top: 5px solid #ff5722; 
+    }
+
+    .card-header {
+        padding: 15px;
+        text-align: center;
+        background: #fafafa;
+    }
+
+    .card-body {
+        padding: 20px;
+        text-align: center;
+    }
+
+    .horarios-grid {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .tag {
+        background: #eef2f3;
+        padding: 5px 10px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        color: #333;
+        width: 100%;
+    }
+
+    hr {
+        border: 0;
+        border-top: 1px solid #eee;
+    }
+
+    .btn-execute {
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        padding: 12px 30px;
+        border-radius: 6px;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.3s ease;
+        width: 100%;
+    }
+
+    .btn-execute:hover {
+        background-color: #45a049;
+    }
+
+    input[type="time"] {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 10px;
+        font-size: 1.2rem;
+        font-family: inherit;
+        background-color: #fff;
+        color: #333;
+        outline: none;
+        transition: border-color 0.3s ease;
+        cursor: pointer;
+    }
+
+    input[type="time"]:focus {
+        border-color: #ff5722;
+        box-shadow: 0 0 5px rgba(255, 87, 34, 0.2);
+    }
+
+    .time-standard {
+        font-size: 1rem !important;
+        padding: 5px !important;
+        background-color: #eef2f3 !important;
+        border: 1px solid #eef2f3 !important;
+    }
+
+    .input-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-bottom: 15px;
+        gap: 8px;
+    }
+
+    .input-container label {
+        font-weight: bold;
+        color: #666;
+        font-size: 0.9rem;
+    }
+
+    .overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .loader {
+        width: 50px;
+        height: 50px;
+        border: 5px solid #FFF;
+        border-bottom-color: #ff5722;
+        border-radius: 50%;
+        display: inline-block;
+        box-sizing: border-box;
+        animation: rotation 1s linear infinite;
+    }
+
+    @keyframes rotation {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+</style>
+<body>
+    <div id="app">
+        <div v-if="loading" class="overlay">
+            <div class="loader"></div>
+        </div>
+
+        <div class="card" >
+            <div class="card-header">
+                <h3>Resumen de Horarios</h3>
+            </div>
+        
+            <div class="card-body">
+
+                <div class="horarios-grid">
+                    <div class="tag"><strong>HO:</strong>
+                        <input type="time" class="time-standard" v-model="hoStartTime">
+                        <strong>-</strong>
+                        <input type="time" class="time-standard" v-model="hoEndTime">
+                    </div>
+                    <div class="tag"><strong>HED:</strong>
+                        <input type="time" class="time-standard" v-model="hedStartTime">
+                        <strong>-</strong>
+                        <input type="time" class="time-standard" v-model="hedEndTime">
+                    </div>
+                    <div class="tag"><strong>HEN:</strong>
+                        <input type="time" class="time-standard" v-model="henStartTime">
+                        <strong>-</strong>
+                        <input type="time" class="time-standard" v-model="henEndTime">
+                    </div>
+                </div>
+
+                <hr>
+
+                <div class="input-container">
+                    <label for="entrada">Entrada:</label>
+                    <input type="time" id="entrada" name="entrada" v-model="startTime">
+                </div>
+
+                <div class="input-container">
+                    <label for="salida">Salida:</label>
+                    <input type="time" id="salida" name="salida" v-model="endTime">
+                </div>
+
+
+                <section v-if="responseSuccess">
+                    <hr>
+                    <h4> Resultados:</h4>
+
+                    <div class="horarios-grid">
+                        <div class="tag" v-for="(value, concept) in hoursWorkedConcept">
+                            <p><strong>{{concept}}:</strong> {{value}} horas</p>
+                        </div>
+                    </div>
+                </section>
+
+                <button class="btn-execute" @click="getHoursWorkedConcept()">Execute</button>
+
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+  const { createApp } = Vue
+
+  createApp({
+    data() {
+      return {
+        loading: false,
+
+        hoStartTime: '08:00',
+        hoEndTime: '17:59',
+        hedStartTime: '18:00',
+        hedEndTime: '20:59',
+        henStartTime: '21:00',
+        henEndTime: '05:59',
+
+        startTime: '00:00',
+        endTime: '00:00',
+
+        responseSuccess: false,
+        hoursWorkedConcept: {},
+      }
+    },
+    methods: {
+        async getHoursWorkedConcept () {
+            if (this.startTime === this.endTime) {
+                return;
+            }
+
+            this.responseSuccess = false
+            this.loading = true
+            fetch('https://falconcloud.co/site_srv10_ph/site/api/qserv.php/13465-770721', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    attendanceIn: this.startTime,
+                    attendanceOut: this.endTime,
+                    concepts:[
+                        {
+                        id: "HO",
+                        name: "HO",
+                        start: this.hoStartTime,
+                        end: this.hoEndTime
+                        },
+                        {
+                        id: "HED",
+                        name: "HED",
+                        start: this.hedStartTime,
+                        end: this.hedEndTime
+                        },
+                        {
+                        id: "HEN",
+                        name: "HEN",
+                        start: this.henStartTime,
+                        end: this.henEndTime
+                        }
+                    ]
+                })
+            })
+            .then((response) => response.json())
+            .then(response => {
+                if (Object.keys(response).length > 0) {
+                    this.hoursWorkedConcept = response
+                }
+            })
+            .catch(error => {
+                alert('Hubo un error al obtener las horas trabajadas');
+                console.error(error);
+            })
+            .finally(() => {
+                this.responseSuccess = true
+                this.loading = false
+            })
+        }
+    }
+  }).mount('#app')
+
+document.querySelectorAll('input[type="time"]').forEach(input => {
+    input.setAttribute('lang', 'es-ES'); 
+});
+
+</script>
+</html>
